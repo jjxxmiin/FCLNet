@@ -1,0 +1,76 @@
+import math
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+
+class FCL(torch.nn.Module):
+    def __init__(self, in_ch, out_ch, filters, stride, padding, groups=1, bias=True):
+        super(FCL, self).__init__()
+        self.out_ch = out_ch
+        self.in_ch = in_ch
+        self.stride = stride
+        self.padding = padding
+        self.groups = groups
+
+        self.filters = nn.Parameter(filters)
+        self.weights = nn.Parameter(torch.Tensor(out_ch, in_ch // groups, filters.size(0)))
+
+        if bias:
+            self.bias = nn.Parameter(torch.Tensor(out_ch))
+        else:
+            self.register_parameter('bias', None)
+
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        n = self.in_ch * self.filters.size(1) * self.filters.size(2)
+        stdv = 1. / math.sqrt(n)
+        self.weights.data.uniform_(-stdv, stdv)
+
+        if self.bias is not None:
+            self.bias.data.uniform_(-stdv, stdv)
+
+    def forward(self, x):
+        f = self.filters.view(1, 1, self.filters.size(0), self.filters.size(1), self.filters.size(2)) * \
+                 self.weights.view(self.out_ch, self.in_ch // self.groups, self.filters.size(0), 1, 1).repeat(1, 1, 1, self.filters.size(1), self.filters.size(2))
+        f = f.sum(2)
+
+        output = F.conv2d(x, f, stride=self.stride, padding=self.padding, groups=self.groups)
+
+        return output
+
+
+def get_filter(filter_type, num_filters, kernel_size=3, device='cuda', seed=20145170):
+    if filter_type == 'uniform':
+        # uniform distribution [r1, r2)
+        r1 = -3
+        r2 = 3
+        filters = torch.autograd.Variable((r1 - r2) * torch.rand(num_filters, kernel_size, kernel_size) + r2).to(device)
+
+    elif filter_type == 'normal':
+        # normal distribution mean : 0 variance : 1
+        filters = torch.autograd.Variable(torch.randn(num_filters, kernel_size, kernel_size)).to(device)
+
+    elif filter_type == 'exp':
+        np.random.seed(seed)
+        filters = torch.autograd.Variable(torch.from_numpy(np.random.exponential(size=(num_filters, kernel_size, kernel_size))).float()).to(device)
+
+    elif filter_type == 'sobel':
+        filters = torch.autograd.Variable(torch.Tensor([[[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]],
+                                                       [[-1, -2, -1], [0, 0, 0], [1, 2, 1]],
+                                                       [[0, 1, 2], [-1, 0, 1], [-2, -1, 0]],
+                                                       [[-2, -1, 0], [-1, 0, 1], [0, 1, 2]]])).to(device)
+
+    elif filter_type == 'line':
+        filters = torch.autograd.Variable(torch.Tensor([[[-1, -1, -1], [2, 2, 2], [-1, -1, -1]],
+                                                        [[-1, -1, 2], [-1, 2, -1], [2, -1, -1]],
+                                                        [[-1, 2, -1], [-1, 2, -1], [-1, 2, -1]],
+                                                        [[2, -1, -1], [-1, 2, -1], [-1, -1, 2]]])).to(device)
+
+    else:
+        print('Conv Filter')
+        filters = None
+
+    return filters
