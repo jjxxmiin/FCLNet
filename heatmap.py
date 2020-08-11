@@ -9,8 +9,7 @@ kernel_size = 3
 num_filters = 3
 device = "cuda"
 
-model = fvgg16_bn(kernel_size=kernel_size,
-                  num_filters=num_filters).to(device)
+model = fvgg16_bn(num_filters=num_filters).to(device)
 
 model.load_state_dict(torch.load("./checkpoint/[].pth"))
 

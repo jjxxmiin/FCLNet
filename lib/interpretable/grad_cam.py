@@ -27,7 +27,7 @@ def scaling(img):
 
 
 class GradCAM(object):
-    def __init__(self, model, label, device='cuda'):
+    def __init__(self, model, label, device='cuda', save_path="./result"):
         self.model = model
         self.model.eval()
 
@@ -37,6 +37,10 @@ class GradCAM(object):
         self.items = []
         self.item_id = 0
         self.label = label
+        self.save_path = save_path
+
+        if not os.path.exists(self.save_path):
+            os.makedirs(self.save_path)
 
     def get_feature_hook(self, name):
         def hook(module, input, output):
@@ -60,6 +64,8 @@ class GradCAM(object):
         tensor_img, target = next(iter(loader))
         tensor_img = tensor_img.to(self.device)
         target = target.item()
+
+        print(f"TARGET : {target}")
 
         # register hook
         self.register()
@@ -101,11 +107,11 @@ class GradCAM(object):
             img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
             img = cv2.resize(img, (224, 224))
 
-            cv2.imwrite(os.path.join(f'./result/origin.jpg'), img)
+            cv2.imwrite(os.path.join(self.save_path, 'origin.jpg'), img)
 
             heatimg = heatmap * 0.4 + img * 0.5
 
-            cv2.imwrite(os.path.join(f'./result/{name}.jpg'), heatimg)
+            cv2.imwrite(os.path.join(self.save_path, f'{name}.jpg'), heatimg)
 
         print(f"Target Class Number  : {target} \n"
               f"Target Class Name    : {self.label[target]} \n"

@@ -9,7 +9,7 @@ from lib.utils import get_logger
 
 parser = argparse.ArgumentParser(description='CIFAR10')
 parser.add_argument('--model_name', type=str, default='vgg16')
-parser.add_argument('--datasets', type=str, default='cifar10')
+parser.add_argument('--datasets', type=str, default='resnet18')
 parser.add_argument('--device', type=str, default='cuda')
 parser.add_argument('--lr', type=float, default=0.1)
 parser.add_argument('--epoch', type=int, default=350)
@@ -60,8 +60,7 @@ test_loader = utils.data.DataLoader(test_dataset,
 
 # model
 if args.model_name == 'vgg16':
-    model = fvgg16_bn(kernel_size=args.kernel_size,
-                      num_filters=args.num_filters).to(args.device)
+    model = fvgg16_bn(num_filters=args.num_filters).to(args.device)
 
 elif args.model_name == 'resnet18':
     model = fresnet18(num_filters=args.num_filters).to(args.device)

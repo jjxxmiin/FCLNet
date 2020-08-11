@@ -3,16 +3,18 @@ import matplotlib.pyplot as plt
 from torch import nn, utils
 from torchvision import datasets, transforms
 from lib.models.cifar10 import fvgg16_bn, fresnet18
-from lib.helper import ClassifyTrainer
+from lib.helper import cifar10_tester
+from lib.models.module import builder
 
-batch_size = 256
+batch_size = 200
 device = "cuda"
 model_name = "vgg16"
+rebuild = True
 
 kernel_size = 3
 num_filters = 3
 
-load_path = "./checkpoint/[].pth"
+load_path = f"./checkpoint/cifar10_vgg16_{num_filters}_3_model.pth"
 
 ratio = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
 
@@ -22,83 +24,48 @@ prune_acc = []
 prune_loss = []
 
 for r in ratio:
-    torch.manual_seed(20145170)
-    torch.cuda.manual_seed(20145170)
-
-    # augmentation
-    test_transformer = transforms.Compose([transforms.ToTensor(),
-                                           transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))])
-
-    # dataset / dataloader
-    test_dataset = datasets.CIFAR10(root='../data',
-                                    train=False,
-                                    transform=test_transformer,
-                                    download=True)
-
-    test_loader = utils.data.DataLoader(test_dataset,
-                                        batch_size=batch_size,
-                                        shuffle=True)
-
-    # model
-    if model_name == 'vgg16':
-        model = fvgg16_bn(kernel_size=kernel_size,
-                          num_filters=num_filters).to(device)
-
-    elif model_name == 'resnet18':
-        model = fresnet18(num_filters=num_filters).to(device)
-
+    # model load
+    model = fvgg16_bn(num_filters=num_filters).to(device)
     model.load_state_dict(torch.load(load_path))
+
+    # build
+    conv_model = builder(model, num_filters=num_filters)
+
     # cost
     criterion = nn.CrossEntropyLoss().to(device)
 
-    trainer = ClassifyTrainer(model,
-                              criterion,
-                              train_loader=None,
-                              test_loader=test_loader,
-                              optimizer=None,
-                              scheduler=None)
+    # test
+    test_loss, test_acc, _ = cifar10_tester(conv_model, batch_size=batch_size)
 
-    test_loss, test_acc, _ = trainer.test()
-    test_acc = test_acc / batch_size
-
-    print(f" + ORIGIN TEST  [Loss / Acc] : [ {test_loss} / {test_acc} ]")
-    origin_acc.append(test_acc)
-    origin_loss.append(test_loss)
-
+    # zero weights
     total = 0
 
-    start = 0
-
-    for m in model.modules():
-        if isinstance(m, nn.Conv2d) and start >= 2:
+    for m in conv_model.modules():
+        if isinstance(m, nn.Conv2d):
             total += m.weight.data.numel()
-        start += 1
 
     conv_weight = torch.zeros(total).cuda()
+
+    # generate mask
     index = 0
 
-    start = 0
-
-    for m in model.modules():
-        if isinstance(m, nn.Conv2d) and start >= 2:
+    for m in conv_model.modules():
+        if isinstance(m, nn.Conv2d):
             size = m.weight.data.numel()
             conv_weight[index:(index + size)] = m.weight.data.view(-1).abs().clone()
             index += size
-
-        start += 1
 
     y, i = torch.sort(conv_weight)
     thre_index = int(total * r)
     thre = y[thre_index]
 
+    # prune
     pruned = 0
     print(f'Pruning Threshold : {thre}')
     zero_flag = False
 
-    start = 0
-
-    for k, m in enumerate(model.modules()):
-        if isinstance(m, nn.Conv2d) and start >= 2:
+    for k, m in enumerate(conv_model.modules()):
+        if isinstance(m, nn.Conv2d):
             weight_copy = m.weight.data.abs().clone()
             mask = weight_copy.gt(thre).float().cuda()
             pruned = pruned + mask.numel() - torch.sum(mask)
@@ -107,25 +74,16 @@ for r in ratio:
                 zero_flag = True
             print(f'layer index: {k} \t total params: {mask.numel()} \t remaining params: {int(torch.sum(mask))}')
 
-        start += 1
+    # prune test
+    prune_test_loss, prune_test_acc, _ = cifar10_tester(conv_model, batch_size=batch_size)
 
-    prune_trainer = ClassifyTrainer(model,
-                                    criterion,
-                                    train_loader=None,
-                                    test_loader=test_loader,
-                                    optimizer=None,
-                                    scheduler=None)
-
-    test_loss, test_acc, _ = prune_trainer.test()
-    test_acc = test_acc / batch_size
-
-    print(f" + PRUNE TEST  [Loss / Acc] : [ {test_loss} / {test_acc} ]")
-
-    prune_acc.append(test_acc)
-    prune_loss.append(test_loss)
+    # log
+    origin_acc.append(test_acc)
+    origin_loss.append(test_loss)
+    prune_acc.append(prune_test_acc)
+    prune_loss.append(prune_test_loss)
 
     print(f'Total conv params: {total}, Pruned conv params: {pruned}, Pruned ratio: {pruned / total}')
-
 
 fig, axes = plt.subplots(1, 2, figsize=(10, 10))
 

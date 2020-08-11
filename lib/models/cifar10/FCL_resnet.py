@@ -9,16 +9,11 @@ class BasicBlock(nn.Module):
     def __init__(self, in_planes, planes, num_filters, stride=1):
         super(BasicBlock, self).__init__()
 
-        filters = get_filter(filter_type='normal',
-                             num_filters=num_filters,
-                             kernel_size=3)
+        # self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=3, stride=stride, padding=1, bias=False)
+        # self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=1, padding=1, bias=False)
 
-        if filters is None:
-            self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=3, stride=stride, padding=1, bias=False)
-            self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=1, padding=1, bias=False)
-        else:
-            self.conv1 = FCL(in_planes, planes, filters=filters, stride=stride, padding=1)
-            self.conv2 = FCL(planes, planes, filters=filters, stride=1, padding=1)
+        self.conv1 = FCL(in_planes, planes, kernel_size=3, num_filters=num_filters, stride=stride, padding=1)
+        self.conv2 = FCL(planes, planes, kernel_size=3, num_filters=num_filters, stride=1, padding=1)
 
         self.bn1 = nn.BatchNorm2d(planes)
         self.bn2 = nn.BatchNorm2d(planes)
@@ -73,14 +68,8 @@ class ResNet(nn.Module):
 
         self.in_planes = 64
 
-        filters = get_filter(filter_type='normal',
-                             num_filters=num_filters,
-                             kernel_size=3)
-
-        if filters is None:
-            self.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
-        else:
-            self.conv1 = FCL(3, 64, filters=filters, stride=1, padding=1)
+        # self.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
+        self.conv1 = FCL(3, 64, kernel_size=3, num_filters=num_filters, stride=1, padding=1)
 
         self.bn1 = nn.BatchNorm2d(64)
         self.layer1 = self._make_layer(block, 64, num_blocks[0], num_filters, stride=1)

@@ -8,26 +8,21 @@ class BasicBlock(nn.Module):
     def __init__(self, in_channels, out_channels, num_filters, stride=1):
         super().__init__()
 
-        filters = get_filter(filter_type='normal',
-                             num_filters=num_filters,
-                             kernel_size=3)
+        # self.residual_function = nn.Sequential(
+        #     nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=stride, padding=1, bias=False),
+        #     nn.BatchNorm2d(out_channels),
+        #     nn.ReLU(inplace=True),
+        #     nn.Conv2d(out_channels, out_channels * BasicBlock.expansion, kernel_size=3, padding=1, bias=False),
+        #     nn.BatchNorm2d(out_channels * BasicBlock.expansion)
+        # )
 
-        if filters is None:
-            self.residual_function = nn.Sequential(
-                nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=stride, padding=1, bias=False),
-                nn.BatchNorm2d(out_channels),
-                nn.ReLU(inplace=True),
-                nn.Conv2d(out_channels, out_channels * BasicBlock.expansion, kernel_size=3, padding=1, bias=False),
-                nn.BatchNorm2d(out_channels * BasicBlock.expansion)
-            )
-        else:
-            self.residual_function = nn.Sequential(
-                FCL(in_channels, out_channels, filters=filters, stride=stride, padding=1),
-                nn.BatchNorm2d(out_channels),
-                nn.ReLU(inplace=True),
-                FCL(out_channels, out_channels * BasicBlock.expansion, filters=filters, stride=1, padding=1),
-                nn.BatchNorm2d(out_channels * BasicBlock.expansion)
-            )
+        self.residual_function = nn.Sequential(
+            FCL(in_channels, out_channels, kernel_size=3, num_filters=num_filters, stride=stride, padding=1),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True),
+            FCL(out_channels, out_channels * BasicBlock.expansion, kernel_size=3, num_filters=num_filters, stride=1, padding=1),
+            nn.BatchNorm2d(out_channels * BasicBlock.expansion)
+        )
 
         # shortcut
         self.shortcut = nn.Sequential()
@@ -78,20 +73,10 @@ class ResNet(nn.Module):
 
         self.in_channels = 64
 
-        filters = get_filter(filter_type='normal',
-                             num_filters=num_filters,
-                             kernel_size=3)
-
-        if filters is None:
-            self.conv1 = nn.Sequential(
-                             nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False),
-                             nn.BatchNorm2d(64),
-                             nn.ReLU(inplace=True))
-        else:
-            self.conv1 = nn.Sequential(
-                FCL(3, 64, filters=filters, stride=1, padding=1, bias=False),
-                nn.BatchNorm2d(64),
-                nn.ReLU(inplace=True))
+        self.conv1 = nn.Sequential(
+            FCL(3, 64, kernel_size=3, num_filters=num_filters, stride=1, padding=1, bias=False),
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True))
 
         # we use a different inputsize than the original paper
         # so conv2_x's stride is 1

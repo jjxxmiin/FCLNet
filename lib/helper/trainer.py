@@ -1,5 +1,6 @@
 import torch
 from tqdm import tqdm
+from torchvision import datasets, transforms
 
 
 class AverageMeter(object):
@@ -92,7 +93,7 @@ class ClassifyTrainer:
             # forward
             output = self.model(images)
             # acc
-            # _, predicted = torch.max(pred, 1)
+            # _, predicted = torch.max(output, 1)
             # correct_meter.update((predicted == labels).sum().item())
             _, pred = output.topk(5, 1, largest=True, sorted=True)
 
@@ -115,3 +116,89 @@ class ClassifyTrainer:
     def save(self, save_path):
         print("MODEL SAVED")
         torch.save(self.model.state_dict(), save_path)
+
+
+def get_cifar10_test_loader(batch_size, shuffle=False):
+    # augmentation
+    test_transformer = transforms.Compose([transforms.ToTensor(),
+                                           transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))])
+
+    # dataset / dataloader
+    test_dataset = datasets.CIFAR10(root='../data',
+                                    train=False,
+                                    transform=test_transformer,
+                                    download=True)
+
+    test_loader = torch.utils.data.DataLoader(test_dataset,
+                                              batch_size=batch_size,
+                                              shuffle=shuffle)
+
+    return test_loader
+
+
+def get_cifar100_test_loader(batch_size):
+    # augmentation
+    test_transformer = transforms.Compose([transforms.ToTensor(),
+                                           transforms.Normalize((0.5071, 0.4865, 0.4409), (0.2673, 0.2564, 0.2762))])
+
+    # dataset / dataloader
+    test_dataset = datasets.CIFAR100(root='../data',
+                                     train=False,
+                                     transform=test_transformer,
+                                     download=True)
+
+    test_loader = torch.utils.data.DataLoader(test_dataset,
+                                              batch_size=batch_size,
+                                              shuffle=False)
+
+    return test_loader
+
+
+def cifar10_tester(model, batch_size=200, device="cuda"):
+    # get test_loader
+    test_loader = get_cifar10_test_loader(batch_size)
+
+    # cost
+    criterion = torch.nn.CrossEntropyLoss().to(device)
+
+    trainer = ClassifyTrainer(model,
+                              criterion,
+                              train_loader=None,
+                              test_loader=test_loader,
+                              optimizer=None,
+                              scheduler=None)
+
+    # train
+    test_loss, top1_acc, top5_acc = trainer.test()
+
+    top1_acc = top1_acc / batch_size
+    top5_acc = top5_acc / batch_size
+
+    print(f"TEST  [Loss / Top1 Acc / Top5 Acc] : [ {test_loss} / {top1_acc} / {top5_acc}]")
+
+    return test_loss, top1_acc, top5_acc
+
+
+def cifar100_tester(model, batch_size=200, device="cuda"):
+    # get test_loader
+    test_loader = get_cifar100_test_loader(batch_size)
+
+    # cost
+    criterion = torch.nn.CrossEntropyLoss().to(device)
+
+    trainer = ClassifyTrainer(model,
+                              criterion,
+                              train_loader=None,
+                              test_loader=test_loader,
+                              optimizer=None,
+                              scheduler=None)
+
+    # train
+    test_loss, top1_acc, top5_acc = trainer.test()
+
+    top1_acc = top1_acc / batch_size
+    top5_acc = top5_acc / batch_size
+
+    print(f"TEST  [Loss / Top1 Acc / Top5 Acc] : [ {test_loss} / {top1_acc} / {top5_acc}]")
+
+    return test_loss, top1_acc, top5_acc

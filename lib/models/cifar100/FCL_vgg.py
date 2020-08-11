@@ -30,7 +30,7 @@ class FVGG(nn.Module):
         return output
 
 
-def make_layers(model_cfg, num_filters, kernel_size, stride, bias, batch_norm=False):
+def make_layers(model_cfg, num_filters, stride, padding, bias, batch_norm=False):
     layers = []
 
     input_channel = 3
@@ -40,22 +40,17 @@ def make_layers(model_cfg, num_filters, kernel_size, stride, bias, batch_norm=Fa
             layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
             continue
 
-        filters = get_filter(filter_type='normal',
-                             num_filters=num_filters,
-                             kernel_size=kernel_size)
-
-        if filters is None:
-            layers += [nn.Conv2d(input_channel, l, kernel_size=kernel_size, padding=int((kernel_size - 1) / 2))]
-        else:
-            layers += [FCL(input_channel, l, filters=filters, stride=stride, padding=int((kernel_size - 1) / 2) + stride - 1, bias=bias)]
+        # layers += [nn.Conv2d(input_channel, l, kernel_size=kernel_size, padding=int((kernel_size - 1) / 2))]
+        layers += [FCL(input_channel, l, kernel_size=3, num_filters=num_filters, stride=stride, padding=padding, bias=bias)]
 
         if batch_norm:
-                layers += [nn.BatchNorm2d(l)]
+            layers += [nn.BatchNorm2d(l)]
 
         layers += [nn.ReLU(inplace=True)]
         input_channel = l
 
     return nn.Sequential(*layers)
 
-def fvgg16_bn(num_filters, kernel_size=3, stride=1, bias=True):
-    return FVGG(make_layers(model_cfg['D'], num_filters, kernel_size, stride, bias, batch_norm=True))
+
+def fvgg16_bn(num_filters, stride=1, padding=1, bias=True):
+    return FVGG(make_layers(model_cfg['D'], num_filters, stride, padding, bias, batch_norm=True))

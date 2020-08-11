@@ -61,8 +61,7 @@ test_loader = utils.data.DataLoader(test_dataset,
 
 # model
 if args.model_name == 'vgg16':
-    model = fvgg16_bn(kernel_size=args.kernel_size,
-                      num_filters=args.num_filters).to(args.device)
+    model = fvgg16_bn(num_filters=args.num_filters).to(args.device)
 
 elif args.model_name == 'resnet18':
     model = fresnet18(num_filters=args.num_filters).to(args.device)
